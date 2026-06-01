@@ -92,8 +92,7 @@ namespace cs2bh
         return vec->Element(slot);
     }
 
-    // True if sid is already live on any connected client other than exceptSlot.
-    // Scoreboard/TAB dedups by SteamID, so a collision hides a player from the list
+    // True if sid is already live on any connected client other than exceptSlot
     static bool IsSteamIdInUseByOther(uint64_t sid, int exceptSlot)
     {
         if (sid == 0 || !g_pNetworkServerService)
@@ -121,10 +120,7 @@ namespace cs2bh
         return false;
     }
 
-    /**
-     * Resolve a SteamID for slot that collides with no other live client.
-     * Tries desired, then unused bot_info entries, then bumps the AccountId
-     */
+    // Resolve a SteamID for slot that collides with other client
     static uint64_t MakeUniqueSteamId(int slot, uint64_t desired)
     {
         if (desired != 0 && !IsSteamIdInUseByOther(desired, slot))
@@ -137,7 +133,7 @@ namespace cs2bh
                 return e.SteamId64;
         }
 
-        // Last resort: bump the AccountId off a base until it is free
+        // Bump the AccountId off a base until it is free
         uint64_t base = desired != 0 ? desired : BotInfoStore::kSteamId64Base + 1;
         for (int bump = 1; bump <= 4096; ++bump)
         {
@@ -145,7 +141,7 @@ namespace cs2bh
             if (!IsSteamIdInUseByOther(candidate, slot))
                 return candidate;
         }
-        return desired; // give up — keep original even if duplicated
+        return desired; // give up
     }
 
     // Resolve UTIL_Remove from server.dll
@@ -308,17 +304,12 @@ namespace cs2bh
         return true;
     }
 
-    /**
-     * Reset a disguised bot's idle timer so mp_autokick won't kick it.
-     * Clearing m_bFakePlayer makes the engine treat the bot as a real player,
-     * so its idle timer climbs with no usercmds. Resolve controller -> m_hPawn
-     * -> pawn and zero m_flIdleTimeSinceLastAction. Offsets come from schema
-     */
+    // Reset a disguised bot's idle timer
     static void ResetIdleTimerForClient(void *pClient)
     {
         if (!pClient)
             return;
-        // controller offsets are schema-resolved (cached after first hit)
+        // controller offsets
         int pawnOff = schema::GetFieldOffset("CBasePlayerController", "m_hPawn");
         int idleOff = schema::GetFieldOffset("CCSPlayerPawnBase", "m_flIdleTimeSinceLastAction");
         if (pawnOff < 0 || idleOff < 0)
@@ -442,7 +433,7 @@ namespace cs2bh
             ssc::ClearFakePlayer(pClient);
         }
 
-        // Write a collision-free SteamID64 into CServerSideClient.m_SteamID
+        // Write a SteamID64 into CServerSideClient.m_SteamID
         if (cfgSid != 0)
         {
             uint64_t sid = MakeUniqueSteamId(idx, cfgSid);
