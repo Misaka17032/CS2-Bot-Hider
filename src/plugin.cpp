@@ -61,8 +61,8 @@ extern INetworkServerService *g_pNetworkServerService;
 // GameResourceServiceServerV001
 static void *g_pGameResourceService = nullptr;
 
-// * UTIL_Remove(CEntityInstance*) — resolved by signature scan in Load(). Used to
-// destroy the CCSPlayerController a kicked bot leaves behind
+// * UTIL_Remove(CEntityInstance*)
+// Used to destroy the CCSPlayerController a kicked bot leaves behind
 
 using UtilRemoveFn = void(__fastcall *)(void * /*CEntityInstance*/);
 static UtilRemoveFn g_pfnUtilRemove = nullptr;
@@ -91,9 +91,7 @@ namespace cs2bh
         return vec->Element(slot);
     }
 
-    // Resolve UTIL_Remove from server.dll by a signature loaded from gamedata.json.
-    // serverModule is the real server.dll (resolved past Metamod's shim); gamedata
-    // carries the pattern under "UTIL_Remove.signatures.windows"
+    // Resolve UTIL_Remove from server.dll
     static void ResolveUtilRemoveAndEntSys(const nlohmann::json &gamedata, HMODULE serverModule)
     {
         if (!serverModule)
@@ -101,7 +99,6 @@ namespace cs2bh
             META_CONPRINTF("[BOTHIDER] warning: server.dll module unresolved for signature scan\n");
             return;
         }
-        // Parse the sig once: needed both to scan and to walk its bytes below
         std::string sigStr = sig::FindWindowsSig(gamedata, "UTIL_Remove");
         std::vector<uint8_t> bytes;
         std::vector<bool> wild;
@@ -115,7 +112,7 @@ namespace cs2bh
             return;
         g_pfnUtilRemove = reinterpret_cast<UtilRemoveFn>(hit);
 
-        // Locate the "48 8B 0D" (mov rcx, [rip+disp32]) and decode the entity-system global
+        // Locate the "48 8B 0D" (mov rcx, [rip+disp32])
         for (size_t i = 0; i + 7 <= bytes.size(); ++i)
         {
             if (bytes[i] == 0x48 && bytes[i + 1] == 0x8B && bytes[i + 2] == 0x0D)
@@ -400,8 +397,8 @@ namespace cs2bh
         RETURN_META(MRES_IGNORED);
     }
 
-    // Clean teardown on disconnect (e.g. bot_kick): restore the bot identity on the
-    // engine client so it tears down as a fake player, then drain all plugin state
+    // Clean teardown on disconnect
+    // Restore the bot identity
     void HiderPlugin::Hook_ClientDisconnect_Pre(CPlayerSlot slot, ENetworkDisconnectionReason /*reason*/,
                                                 const char * /*pszName*/, uint64 /*xuid*/,
                                                 const char * /*pszNetworkID*/)
@@ -414,11 +411,10 @@ namespace cs2bh
         if (!Personas().IsSlotManaged(idx))
             RETURN_META(MRES_IGNORED);
 
-        // Capture the persona name before state is cleared so we can free its assignment
+        // Capture the persona name
         std::string persona = Personas().GetSlotName(idx);
 
-        // Restore engine-side bot identity: re-set m_bFakePlayer and wipe the forged
-        // SteamID so the engine releases the slot as a bot (avoids "already in the game")
+        // Restore engine-side bot identity
         void *pClient = ResolveClientBySlot(idx);
         if (pClient)
         {
@@ -431,7 +427,7 @@ namespace cs2bh
             DestroyControllerForClient(pClient);
         }
 
-        // Free the bot_info assignment so the same persona can be reused next spawn
+        // Free the bot_info assignment
         if (!persona.empty())
             BotInfo().ReleaseAssignment(BotInfo().FindByName(persona.c_str()));
 
