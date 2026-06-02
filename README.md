@@ -29,11 +29,9 @@ C# plugin.
 
 - Removes the `BOT` tag from the scoreboard
 - Per-bot SteamID64, name, ping, and crosshair
-- Same-name priority, otherwise random persona assignment
-- Re-randomizes on every map change
 - `IBotHiderApi` capability for other CSS plugins
 - Read **and** write access (override a bot's SteamID / name at runtime)
-- Zero engine detours on the C# side (shared-memory bridge)
+- `IsBot` override: managed bots report `IsBot == true` to every CSS plugin
 
 ------------------------------------------------------------------------
 
@@ -53,15 +51,22 @@ C# plugin.
         addons/metamod/BotHider.vdf
         addons/BotHider/bot_info.json
 
-2. Install **BotHiderImpl** as a CS# plugin:
+2. Install **BotHiderImpl** as a CS# plugin, together with `0Harmony.dll`:
 
         addons/counterstrikesharp/plugins/BotHiderImpl/BotHiderImpl.dll
+        addons/counterstrikesharp/plugins/BotHiderImpl/0Harmony.dll
 
 3. Install **BotHiderApi** as a shared assembly:
 
         addons/counterstrikesharp/shared/BotHiderApi/BotHiderApi.dll
 
-4. Restart the server.
+4. Install **0Harmony** as a shared assembly as well — this is
+   **required**. the same DLL must live in both places:
+
+        addons/counterstrikesharp/plugins/BotHiderImpl/0Harmony.dll
+        addons/counterstrikesharp/shared/0Harmony/0Harmony.dll
+
+5. Restart the server.
 
 ------------------------------------------------------------------------
 
@@ -123,8 +128,7 @@ dotnet build csharp/BotHiderApi/BotHiderApi.csproj -c Release
 
 ## Configuration
 
-`bot_info.json` maps a player name to a SteamID (32-bit account id) and a
-crosshair share-code:
+`bot_info.json` maps a player name to a SteamID (32-bit account id) and a crosshair share-code:
 
 ``` json
 {
@@ -135,10 +139,8 @@ crosshair share-code:
 }
 ```
 
-On spawn, BotHider prefers an entry whose key matches the engine's
-proposed bot name; otherwise it picks a random unused entry. Assignments
-reset on map change. If the file is missing, the plugin falls back to a
-built-in roster (no SteamID / crosshair).
+On spawn, BotHider prefers an entry whose key matches the engine's proposed bot name
+Otherwise it picks a random unused entry.
 
 ## Getting the API (C#)
 
@@ -168,12 +170,15 @@ public override void OnAllPluginsLoaded(bool hotReload) => _api = Cap.Get();
 
 ## Reading bot state (C#)
 
-Because BotHider clears `m_bFakePlayer`, **disguised bots no longer
-report as bots** through the usual checks. Use the API instead:
-
-| Before                        | After                            |
+| Check                         | bot result                       |
 |-------------------------------|----------------------------------|
-| `player.IsBot`                | `_api.IsManagedBot(player.Slot)` |
+| `player.IsBot`                | `true` (restored by the patch)   |
+| `_api.IsManagedBot(slot)`     | `true` (direct, patch-free)      |
+
+`player.IsBot` is the convenient path. Prefer `_api.IsManagedBot(slot)`
+when you need a guarantee independent of the patch
+e.g. a call site the JIT may have already inlined before the patch was applied,
+which the Harmony override cannot reach.
 
 ``` csharp
 foreach (int slot in _api.GetManagedSlots())
@@ -186,10 +191,8 @@ foreach (int slot in _api.GetManagedSlots())
 
 ## Overriding identity at runtime (C#)
 
-`SetBotSteamId` and `SetPersonaName` post a command to the C++ side; the
-change is applied on the **next server frame**, so re-query to confirm.
-Both return `false` for an invalid slot (and `SetPersonaName` rejects an
-empty name).
+`SetBotSteamId` and `SetPersonaName` post a command to the C++ side, so re-query to confirm.
+Both return `false` for an invalid slot (and `SetPersonaName` rejects an empty name).
 
 ``` csharp
 // Give the bot in slot 3 a specific SteamID64 + name.
@@ -203,8 +206,7 @@ if (_api.SetPersonaName(3, "ZywOo"))
 
 ```
 
-`SetPersonaName` also drives the scoreboard via the controller schema, so
-the new name is networked to clients — not just stored internally.
+`SetPersonaName` also drives the scoreboard via the controller schema
 
 ------------------------------------------------------------------------
 
