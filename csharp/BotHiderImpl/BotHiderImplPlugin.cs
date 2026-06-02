@@ -6,13 +6,14 @@ using CounterStrikeSharp.API.Core.Capabilities;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Timers;
+using HarmonyLib;
 
 namespace BotHiderImpl;
 
 public class BotHiderImplPlugin : BasePlugin
 {
     public override string ModuleName => "BotHiderImpl";
-    public override string ModuleVersion => "0.1.1";
+    public override string ModuleVersion => "0.2.0";
     public override string ModuleAuthor => "XBribo";
     public override string ModuleDescription =>
         "BotHider CSS Plugin";
@@ -22,6 +23,7 @@ public class BotHiderImplPlugin : BasePlugin
 
     private SharedMemoryClient? _client;
     private readonly string[] _appliedCrosshair = new string[64];
+    private Harmony? _harmony;
 
     public override void Load(bool hotReload)
     {
@@ -31,11 +33,20 @@ public class BotHiderImplPlugin : BasePlugin
         _client.TryConnect();
         Capabilities.RegisterPluginCapability(Capability, () => (IBotHiderApi)_client);
 
+        // IsBot override
+        IsBotPatch.Api = _client;
+        _harmony = new Harmony("net.linyz.bothider.isbot");
+        _harmony.PatchAll(typeof(BotHiderImplPlugin).Assembly);
+
         AddTimer(2.0f, ApplyManagedSlots, TimerFlags.REPEAT);
     }
 
     public override void Unload(bool hotReload)
     {
+        // Undo the patch first
+        _harmony?.UnpatchAll(_harmony.Id);
+        _harmony = null;
+        IsBotPatch.Api = null;
         _client?.Dispose();
     }
 
@@ -119,10 +130,12 @@ public class BotHiderImplPlugin : BasePlugin
         cmd.ReplyToCommand($"[BotHider] managed slots: {slots.Length}");
         foreach (int s in slots)
         {
+            var p = Utilities.GetPlayerFromSlot(s);
+            string isBot = (p != null && p.IsValid) ? p.IsBot.ToString() : "n/a";
             cmd.ReplyToCommand(
                 $"  slot={s} sid={_client.GetSyntheticSteamId(s)} " +
                 $"name='{_client.GetPersonaName(s)}' ping={_client.GetPing(s)} " +
-                $"crosshair='{_client.GetCrosshairCode(s)}'");
+                $"crosshair='{_client.GetCrosshairCode(s)}' isbot={isBot}");
         }
     }
 
