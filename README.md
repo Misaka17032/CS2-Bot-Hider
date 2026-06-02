@@ -37,6 +37,34 @@ C# plugin.
 
 ------------------------------------------------------------------------
 
+## Console commands
+
+- `bh_status` — list every managed slot: sid, name, ping, crosshair.
+- `bh_setname <slot> <name>` — set bot's name.
+- `bh_setsid <slot> <SteamID64>` — set bot's SteamID.
+
+------------------------------------------------------------------------
+
+## Install
+
+1. Copy the Metamod plugin + config into the game tree:
+
+        addons/BotHider/bin/win64/BotHider.dll
+        addons/metamod/BotHider.vdf
+        addons/BotHider/bot_info.json
+
+2. Install **BotHiderImpl** as a CS# plugin:
+
+        addons/counterstrikesharp/plugins/BotHiderImpl/BotHiderImpl.dll
+
+3. Install **BotHiderApi** as a shared assembly:
+
+        addons/counterstrikesharp/shared/BotHiderApi/BotHiderApi.dll
+
+4. Restart the server.
+
+------------------------------------------------------------------------
+
 ## Components
 
 | Project        | Output             | Role                                            |
@@ -90,24 +118,6 @@ cmake --build build --config Release
 dotnet build csharp/BotHiderImpl/BotHiderImpl.csproj -c Release
 dotnet build csharp/BotHiderApi/BotHiderApi.csproj -c Release
 ```
-
-## Install
-
-1. Copy the Metamod plugin + config into the game tree:
-
-        addons/BotHider/bin/win64/BotHider.dll
-        addons/metamod/BotHider.vdf
-        addons/BotHider/bot_info.json
-
-2. Install **BotHiderImpl** as a CS# plugin:
-
-        addons/counterstrikesharp/plugins/BotHiderImpl/BotHiderImpl.dll
-
-3. Install **BotHiderApi** as a shared assembly:
-
-        addons/counterstrikesharp/shared/BotHiderApi/BotHiderApi.dll
-
-4. Restart the server.
 
 ------------------------------------------------------------------------
 
@@ -195,12 +205,6 @@ if (_api.SetPersonaName(3, "ZywOo"))
 
 `SetPersonaName` also drives the scoreboard via the controller schema, so
 the new name is networked to clients — not just stored internally.
-
-------------------------------------------------------------------------
-
-## Console commands
-
-- `bh_status` — list every managed slot: sid, name, ping, crosshair.
 
 ------------------------------------------------------------------------
 
