@@ -562,7 +562,7 @@ namespace cs2bh
             RETURN_META(MRES_IGNORED);
         const char *cmdName = cmd.GetName();
 
-        // ! Manual bot_add* — open the allow window so CFC PRE lets this creation through the gate
+        // Manual bot_add* — open the allow window
         if (IsBotAddCommand(cmdName))
         {
             m_bAllowBotAdd = true;
@@ -572,9 +572,9 @@ namespace cs2bh
         if (!IsKickCommand(cmdName))
             RETURN_META(MRES_IGNORED);
 
-        // ! Close the gate so MaintainBotQuota cannot refill the kicked bot(s)
+        // Close the gate so MaintainBotQuota
         m_bBlockBotCreation = true;
-        m_bRefillBlockLogged = false; // re-arm the one-shot block log for this kick episode
+        m_bRefillBlockLogged = false;
 
         int restored = 0;
         for (int idx = 0; idx < PersonaPool::kMaxSlots; ++idx)
@@ -605,7 +605,7 @@ namespace cs2bh
             RETURN_META(MRES_IGNORED);
         const char *cmdName = cmd.GetName();
 
-        // ! bot_add* finished dispatching — close the allow window
+        // close the allow window
         if (IsBotAddCommand(cmdName))
         {
             m_bAllowBotAdd = false;
@@ -631,10 +631,7 @@ namespace cs2bh
                 *reinterpret_cast<uint64_t *>(raw + ssc::OFFSET_m_SteamID) = sid;
             ++redisguised;
         }
-        // ! Pin bot_quota to the surviving managed-bot count so MaintainBotQuota's desired
-        // count == current count — the engine stops retrying CreateFakeClient, killing its
-        // native "Unable to create bot" spam at the source. Deferred one frame by the engine.
-        // Mode is left untouched per design; fill/match may still differ from this count.
+        // Set bot_quota
         if (engine)
         {
             char quotaCmd[48];
@@ -654,10 +651,10 @@ namespace cs2bh
             RETURN_META_VALUE(MRES_IGNORED, CPlayerSlot(-1));
         }
 
-        // ! Block engine quota refills after a kick — but let manual bot_add* punch through
+        // Block engine quota refills after a kick — but let manual bot_add* punch through
         if (m_bBlockBotCreation && !m_bAllowBotAdd)
         {
-            // Log once per kick episode — the engine retries this every few ticks
+            // Log once per kick episode
             if (!m_bRefillBlockLogged)
             {
                 META_CONPRINTF("[BOTHIDER] CFC PRE blocking engine refills (gate closed since kick)\n");
@@ -704,7 +701,7 @@ namespace cs2bh
         g_ExpectedNames.clear();
         Manager().ReleaseAll();
         BotInfo().ResetAssignments();
-        m_bBlockBotCreation = false; // ! Reopen the gate so the new map can fill its initial bots
+        m_bBlockBotCreation = false; // Reopen the gate
         m_bRefillBlockLogged = false;
         META_CONPRINTF("[BOTHIDER] StartChangeLevel PRE — map='%s' landmark='%s'\n",
                        mapName ? mapName : "?", landmark ? landmark : "");
