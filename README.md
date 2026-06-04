@@ -40,6 +40,7 @@ C# plugin.
 - `bh_status` — list every managed slot: sid, name, ping, crosshair.
 - `bh_setname <slot> <name>` — set bot's name.
 - `bh_setsid <slot> <SteamID64>` — set bot's SteamID.
+- `bh_disguise <1/0>` — toggle bot disguise on/off
 
 ------------------------------------------------------------------------
 
