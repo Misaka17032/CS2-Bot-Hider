@@ -48,6 +48,9 @@ namespace cs2bh::shm
         kCmd_SetSteamId = 1,
         kCmd_SetPersona = 2,
         kCmd_SetDisguise = 3, // global toggle, on/off carried in Command.SteamId
+        kCmd_Rebuild = 4,     // global clean-rebuild on same-map rematch
+        kCmd_KickAll = 5,     // match end: restore flags, bot_kick all, hold quota at 0
+        kCmd_Refill = 6,      // match begin: refill bot_quota to the saved value
     };
 
     // Sentinel slot for global (non-per-slot) commands

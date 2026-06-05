@@ -13,7 +13,7 @@ namespace BotHiderImpl;
 public class BotHiderImplPlugin : BasePlugin
 {
     public override string ModuleName => "BotHiderImpl";
-    public override string ModuleVersion => "0.2.0";
+    public override string ModuleVersion => "0.2.1";
     public override string ModuleAuthor => "XBribo";
     public override string ModuleDescription =>
         "BotHider CSS Plugin";
@@ -48,6 +48,17 @@ public class BotHiderImplPlugin : BasePlugin
         _harmony = null;
         IsBotPatch.Api = null;
         _client?.Dispose();
+    }
+
+    // Match end
+    [GameEventHandler]
+    public HookResult OnWinPanelMatch(EventCsWinPanelMatch @event, GameEventInfo info)
+    {
+        // 5s
+        AddTimer(5.0f, () => _client?.RequestKickAll());
+        // 7s
+        AddTimer(7.0f, () => _client?.RequestRefill());
+        return HookResult.Continue;
     }
 
     // Set CCSPlayerController.m_iszPlayerName
@@ -121,7 +132,7 @@ public class BotHiderImplPlugin : BasePlugin
         }
     }
 
-    // bh_status — dump every managed slot's state (sid + persona name)
+    // bh_status — dump every managed slot's state
     [ConsoleCommand("bh_status", "List all BotHider-managed slots")]
     public void OnStatus(CCSPlayerController? player, CommandInfo cmd)
     {
@@ -163,7 +174,7 @@ public class BotHiderImplPlugin : BasePlugin
         cmd.ReplyToCommand($"[BotHider] SetPersonaName({slot},'{name}') -> {ok}");
     }
 
-    // bh_disguise <0|1> — toggle the m_bFakePlayer disguise (turn off on aim_*/practice maps)
+    // bh_disguise <0|1> — toggle the m_bFakePlayer disguise
     [ConsoleCommand("bh_disguise", "Toggle disguise: bh_disguise <0|1>")]
     public void OnDisguise(CCSPlayerController? player, CommandInfo cmd)
     {

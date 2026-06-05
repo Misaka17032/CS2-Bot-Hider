@@ -18,6 +18,9 @@ namespace cs2bh
         using SteamIdSink = std::function<void(int slot, uint64_t sid)>;
         using PersonaSink = std::function<void(int slot, const char *name)>;
         using DisguiseSink = std::function<void(bool enabled)>;
+        using RebuildSink = std::function<void()>;
+        using KickAllSink = std::function<void()>;
+        using RefillSink = std::function<void()>;
 
         ~SlotPublisher();
 
@@ -35,7 +38,8 @@ namespace cs2bh
 
         // CSS->C++
         void DrainCommands(const SteamIdSink &onSteamId, const PersonaSink &onPersona,
-                           const DisguiseSink &onDisguise);
+                           const DisguiseSink &onDisguise, const RebuildSink &onRebuild,
+                           const KickAllSink &onKickAll, const RefillSink &onRefill);
 
         bool Active() const { return m_pView != nullptr; }
 

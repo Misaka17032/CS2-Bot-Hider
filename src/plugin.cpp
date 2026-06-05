@@ -703,8 +703,8 @@ namespace cs2bh
         if (!IsKickCommand(cmdName))
             RETURN_META(MRES_IGNORED);
 
-        // Disguise-toggle
-        if (m_bRebuilding)
+        // Match-end kickid storm or disguise-toggle rebuild: leave identities alone
+        if (m_bSuppressKickHooks || m_bRebuilding)
             RETURN_META(MRES_IGNORED);
 
         int restored = 0;
@@ -737,6 +737,10 @@ namespace cs2bh
         const char *cmdName = cmd.GetName();
 
         if (!IsKickCommand(cmdName))
+            RETURN_META(MRES_IGNORED);
+
+        // Match-end kickid storm: do nothing — RefillBots clears the flag next match
+        if (m_bSuppressKickHooks)
             RETURN_META(MRES_IGNORED);
 
         // Disguise-toggle rebuild: skip re-disguise + quota write, clear the flag
@@ -833,6 +837,103 @@ namespace cs2bh
             }
         }
         META_CONPRINTF("[BOTHIDER] disguise %s (no rebuild)\n", enabled ? "ON" : "OFF");
+    }
+
+    // Clean-rebuild on rematch
+    void HiderPlugin::RebuildBots()
+    {
+        if (m_bSelfDisabled || !m_bDisguiseEnabled || !engine || m_bRebuilding)
+            return;
+
+        // Restore m_bFakePlayer
+        int managed = 0;
+        for (int idx = 0; idx < PersonaPool::kMaxSlots; ++idx)
+        {
+            if (!Manager().IsManaged(idx))
+                continue;
+            void *pClient = ResolveClientBySlot(idx);
+            if (pClient)
+                ssc::SetFakePlayer(pClient);
+            ++managed;
+        }
+        if (managed == 0)
+            return;
+
+        // Re-fill
+        int quota = managed;
+        ConVarRefAbstract botQuota("bot_quota");
+        if (botQuota.IsValidRef())
+            quota = botQuota.GetInt();
+
+        m_bRebuilding = true;
+        char quotaCmd[48];
+        std::snprintf(quotaCmd, sizeof(quotaCmd), "bot_quota %d\n", quota);
+        // Drop quota to 0 before kicking: otherwise the engine keeps bots alive to
+        // satisfy the live quota mid-kick, and survivors skip CreateFakeClient (stay undisguised)
+        engine->ServerCommand("bot_quota 0\n");
+        engine->ServerCommand("bot_kick all\n");
+        engine->ServerCommand(quotaCmd);
+        META_CONPRINTF("[BOTHIDER] rematch rebuild — kicked %d bot(s), bot_quota->%d\n",
+                       managed, quota);
+    }
+
+    // Match-end
+    void HiderPlugin::KickAllBots()
+    {
+        if (m_bSelfDisabled || !engine)
+            return;
+
+        int quota = 0;
+        ConVarRefAbstract botQuota("bot_quota");
+        if (botQuota.IsValidRef())
+            quota = botQuota.GetInt();
+
+        m_bSuppressKickHooks = true;
+
+        engine->ServerCommand("bot_quota 0\n");
+
+        // kickid
+        int kicked = 0;
+        int managed = 0;
+        for (int idx = 0; idx < PersonaPool::kMaxSlots; ++idx)
+        {
+            if (!Manager().IsManaged(idx))
+                continue;
+            ++managed;
+            void *pClient = ResolveClientBySlot(idx);
+            if (!pClient)
+                continue;
+            ssc::SetFakePlayer(pClient);
+            int16_t userId = *reinterpret_cast<int16_t *>(
+                reinterpret_cast<unsigned char *>(pClient) + ssc::OFFSET_m_UserID);
+            char kickCmd[32];
+            std::snprintf(kickCmd, sizeof(kickCmd), "kickid %d\n", static_cast<int>(userId));
+            engine->ServerCommand(kickCmd);
+            ++kicked;
+        }
+
+        m_SavedQuota = quota > 0 ? quota : managed;
+        META_CONPRINTF("[BOTHIDER] match-end kick — kickid issued for %d/%d bot(s), "
+                       "quota saved=%d, held at 0\n",
+                       kicked, managed, m_SavedQuota);
+    }
+
+    // Match-begin
+    void HiderPlugin::RefillBots()
+    {
+        if (m_bSelfDisabled || !engine)
+            return;
+        m_bSuppressKickHooks = false;
+        int quota = m_SavedQuota > 0 ? m_SavedQuota : 0;
+        if (quota == 0)
+        {
+            META_CONPRINTF("[BOTHIDER] match-begin refill skipped — no saved quota\n");
+            return;
+        }
+        char quotaCmd[48];
+        std::snprintf(quotaCmd, sizeof(quotaCmd), "bot_quota %d\n", quota);
+        engine->ServerCommand(quotaCmd);
+        META_CONPRINTF("[BOTHIDER] match-begin refill — bot_quota->%d\n", quota);
     }
 
     // Replace the name with the next name from bot_info.json
@@ -945,6 +1046,21 @@ namespace cs2bh
             [this](bool enabled)
             {
                 SetDisguiseEnabled(enabled);
+            },
+            // REBUILD
+            [this]()
+            {
+                RebuildBots();
+            },
+            // KICK_ALL
+            [this]()
+            {
+                KickAllBots();
+            },
+            // REFILL
+            [this]()
+            {
+                RefillBots();
             });
         RETURN_META(MRES_IGNORED);
     }
@@ -971,7 +1087,7 @@ namespace cs2bh
         }
         META_CONPRINTF("[BOTHIDER] OnLevelInit map=%s\n", pMapName ? pMapName : "?");
 
-        // Whitelisted maps run disguised; enable once on level init (idempotent)
+        // Whitelisted maps run disguised
         if (IsDisguiseWhitelistMap(pMapName) && !m_bDisguiseEnabled)
         {
             META_CONPRINTF("[BOTHIDER] whitelist map '%s' — enabling disguise\n", pMapName);
@@ -1000,7 +1116,6 @@ namespace cs2bh
 
         // GameResourceServiceServer — needed to resolve CCSPlayerController by slot
         // Served by engine2.dll
-        // Fetched opaquely; if missing, controller management self-disables
         g_pGameResourceService = ismm->GetEngineFactory(false)(
             targets::kIface_GameResourceServiceServer, nullptr);
         if (!g_pGameResourceService)
@@ -1103,7 +1218,7 @@ namespace cs2bh
                            jsonPath.c_str());
         }
 
-        // Load the disguise map whitelist
+        // Load the map whitelist
         std::string wlPath = g_SMAPI->GetBaseDir();
         wlPath += "/addons/BotHider/map_whitelist.json";
         LoadDisguiseWhitelist(wlPath.c_str());

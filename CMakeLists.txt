@@ -143,12 +143,20 @@ set_target_properties(BotHider PROPERTIES
 add_custom_command(TARGET BotHider POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         "${CMAKE_BINARY_DIR}/package/addons/metamod"
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "${CMAKE_BINARY_DIR}/package/addons/BotHider"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_SOURCE_DIR}/BotHider.vdf"
+        "${CMAKE_SOURCE_DIR}/configs/addons/metamod/BotHider.vdf"
         "${CMAKE_BINARY_DIR}/package/addons/metamod/BotHider.vdf"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_SOURCE_DIR}/map_whitelist.json"
+        "${CMAKE_SOURCE_DIR}/configs/addons/BotHider/map_whitelist.json"
         "${CMAKE_BINARY_DIR}/package/addons/BotHider/map_whitelist.json"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/configs/addons/BotHider/bot_info.json"
+        "${CMAKE_BINARY_DIR}/package/addons/BotHider/bot_info.json"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/configs/addons/BotHider/gamedata.json"
+        "${CMAKE_BINARY_DIR}/package/addons/BotHider/gamedata.json"
 )
 
 if(MSVC)

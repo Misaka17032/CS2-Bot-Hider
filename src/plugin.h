@@ -64,6 +64,15 @@ namespace cs2bh
         // Toggle disguise globally; re-applies or restores m_bFakePlayer on all managed slots
         void SetDisguiseEnabled(bool enabled);
 
+        // Clean-rebuild bots on same-map rematch: restore identities, bot_kick, re-fill to bot_quota
+        void RebuildBots();
+
+        // Two-phase rematch cleanup (avoids the cooldown bot-churn race):
+        // match end → restore flags, bot_kick all, hold bot_quota at 0
+        void KickAllBots();
+        // match begin → restore bot_quota to the value saved at the previous match end
+        void RefillBots();
+
     private:
         void *m_pHookedGameServer = nullptr;
         int m_StartChangeLevelHookId = 0;
@@ -73,6 +82,11 @@ namespace cs2bh
         bool m_bDisguiseEnabled = true;
         // ! Set while rebuilding bots on a disguise toggle so our own kick handlers skip
         bool m_bRebuilding = false;
+        // ! bot_quota captured at match-end KickAllBots, restored at match-begin RefillBots
+        int m_SavedQuota = 0;
+        // ! Set across the whole match-end kickid storm so our own kick hooks fully skip;
+        //   cleared at match-begin RefillBots and on level change
+        bool m_bSuppressKickHooks = false;
     };
 
     extern HiderPlugin g_Plugin;

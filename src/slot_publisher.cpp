@@ -170,7 +170,10 @@ namespace cs2bh
 
     void SlotPublisher::DrainCommands(const SteamIdSink &onSteamId,
                                       const PersonaSink &onPersona,
-                                      const DisguiseSink &onDisguise)
+                                      const DisguiseSink &onDisguise,
+                                      const RebuildSink &onRebuild,
+                                      const KickAllSink &onKickAll,
+                                      const RefillSink &onRefill)
     {
         if (!m_pView)
             return;
@@ -185,10 +188,28 @@ namespace cs2bh
         while (r != w && budget-- > 0)
         {
             const shm::Command &c = cmds[r % shm::kCmdCount];
-            // Global command (no per-slot target)
+            // Global commands (no per-slot target)
             if (c.Type == shm::kCmd_SetDisguise && onDisguise)
             {
                 onDisguise(c.SteamId != 0);
+                ++r;
+                continue;
+            }
+            if (c.Type == shm::kCmd_Rebuild && onRebuild)
+            {
+                onRebuild();
+                ++r;
+                continue;
+            }
+            if (c.Type == shm::kCmd_KickAll && onKickAll)
+            {
+                onKickAll();
+                ++r;
+                continue;
+            }
+            if (c.Type == shm::kCmd_Refill && onRefill)
+            {
+                onRefill();
                 ++r;
                 continue;
             }
