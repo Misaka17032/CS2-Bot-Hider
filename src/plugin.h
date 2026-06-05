@@ -31,7 +31,7 @@ namespace cs2bh
         const char *GetDescription() override { return "Bot persona/steamid/ping hider"; }
         const char *GetURL() override { return ""; }
         const char *GetLicense() override { return "GPLv3"; }
-        const char *GetVersion() override { return "0.1.4"; }
+        const char *GetVersion() override { return "0.1.5"; }
         const char *GetDate() override { return __DATE__; }
         const char *GetLogTag() override { return "BOTHIDER"; }
 
@@ -61,16 +61,13 @@ namespace cs2bh
         using CUtlStringSetFn = void (*)(void * /*CUtlString this*/, const char *);
         CUtlStringSetFn m_pUtlStringSet = nullptr;
 
-        // Toggle disguise globally; re-applies or restores m_bFakePlayer on all managed slots
+        // Toggle disguise globally
         void SetDisguiseEnabled(bool enabled);
 
-        // Clean-rebuild bots on same-map rematch: restore identities, bot_kick, re-fill to bot_quota
         void RebuildBots();
 
-        // Two-phase rematch cleanup (avoids the cooldown bot-churn race):
-        // match end → restore flags, bot_kick all, hold bot_quota at 0
         void KickAllBots();
-        // match begin → restore bot_quota to the value saved at the previous match end
+
         void RefillBots();
 
     private:
@@ -78,14 +75,13 @@ namespace cs2bh
         int m_StartChangeLevelHookId = 0;
         bool m_bSelfDisabled = false;
         unsigned int m_TickCounter = 0; // throttles per-tick idle-timer reset
-        // ! Master disguise switch: false on bot-manager-driven maps (e.g. aim_*) so bots still spawn
+        // Master disguise switch
         bool m_bDisguiseEnabled = true;
-        // ! Set while rebuilding bots on a disguise toggle so our own kick handlers skip
+
         bool m_bRebuilding = false;
-        // ! bot_quota captured at match-end KickAllBots, restored at match-begin RefillBots
+
         int m_SavedQuota = 0;
-        // ! Set across the whole match-end kickid storm so our own kick hooks fully skip;
-        //   cleared at match-begin RefillBots and on level change
+
         bool m_bSuppressKickHooks = false;
     };
 

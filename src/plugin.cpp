@@ -703,7 +703,7 @@ namespace cs2bh
         if (!IsKickCommand(cmdName))
             RETURN_META(MRES_IGNORED);
 
-        // Match-end kickid storm or disguise-toggle rebuild: leave identities alone
+        // Match-end kickid
         if (m_bSuppressKickHooks || m_bRebuilding)
             RETURN_META(MRES_IGNORED);
 
@@ -739,7 +739,7 @@ namespace cs2bh
         if (!IsKickCommand(cmdName))
             RETURN_META(MRES_IGNORED);
 
-        // Match-end kickid storm: do nothing — RefillBots clears the flag next match
+        // Match-end kickid
         if (m_bSuppressKickHooks)
             RETURN_META(MRES_IGNORED);
 
