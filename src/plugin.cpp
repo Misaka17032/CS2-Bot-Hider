@@ -507,22 +507,17 @@ namespace cs2bh
         }
 
         // Write a SteamID64 into CServerSideClient.m_SteamID
+        uint64_t sid = 0;
         if (cfgSid != 0)
         {
-            uint64_t sid = MakeUniqueSteamId(idx, cfgSid);
+            sid = MakeUniqueSteamId(idx, cfgSid);
             *reinterpret_cast<uint64_t *>(raw + ssc::OFFSET_m_SteamID) = sid;
             Manager().SetSyntheticSid(idx, sid);
             Publisher().UpdateSyntheticSid(idx, sid);
-            META_CONPRINTF("[BOTHIDER] slot=%d steamid64=%llu written at +%d\n",
-                           idx, (unsigned long long)sid, ssc::OFFSET_m_SteamID);
-        }
-        else
-        {
-            META_CONPRINTF("[BOTHIDER] slot=%d name='%s' not in bot_info.json — no steamid write\n",
-                           idx, pszName ? pszName : "<null>");
         }
 
-        META_CONPRINTF("[BOTHIDER] OCC done slot=%d name='%s'\n", idx, pszName ? pszName : "<null>");
+        META_CONPRINTF("[BOTHIDER] slot=%d steamid64=%llu name='%s'\n",
+                       idx, (unsigned long long)sid, pszName ? pszName : "<null>");
         RETURN_META(MRES_IGNORED);
     }
 
@@ -768,8 +763,7 @@ namespace cs2bh
             *reinterpret_cast<uint64_t *>(raw + ssc::OFFSET_m_SteamID) = 0;
             ++restored;
         }
-        META_CONPRINTF("[BOTHIDER] kick PRE '%s' — restored %d managed slot(s)\n",
-                       cmdName, restored);
+        META_CONPRINTF("[BOTHIDER] kick PRE '%s' restored=%d\n", cmdName, restored);
         RETURN_META(MRES_IGNORED);
     } // end Hook_DispatchConCommand_Pre
 
@@ -822,7 +816,7 @@ namespace cs2bh
             std::snprintf(quotaCmd, sizeof(quotaCmd), "bot_quota %d\n", redisguised);
             engine->ServerCommand(quotaCmd);
         }
-        META_CONPRINTF("[BOTHIDER] kick POST '%s' — re-disguised %d surviving slot(s), bot_quota->%d\n",
+        META_CONPRINTF("[BOTHIDER] kick POST '%s' redisguised=%d quota=%d\n",
                        cmd.GetName(), redisguised, redisguised);
         RETURN_META(MRES_IGNORED);
     } // end Hook_DispatchConCommand_Post
@@ -1013,8 +1007,6 @@ namespace cs2bh
         static thread_local std::string s_PersonaBuffer;
         s_PersonaBuffer = persona;
 
-        META_CONPRINTF("[BOTHIDER] CFC PRE override '%s' -> '%s'\n",
-                       netname ? netname : "<null>", s_PersonaBuffer.c_str());
         const char *personaCStr = s_PersonaBuffer.c_str();
         RETURN_META_VALUE_NEWPARAMS(MRES_HANDLED, CPlayerSlot(-1),
                                     &IVEngineServer::CreateFakeClient, (personaCStr));
