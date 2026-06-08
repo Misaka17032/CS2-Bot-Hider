@@ -38,6 +38,7 @@ When the engine spawns a fake client, BotHider:
 - `bh_setname <slot> <name>` — set bot's name.
 - `bh_setsid <slot> <SteamID64>` — set bot's SteamID.
 - `bh_disguise <0/1>` — toggle bot disguise off/on
+- `bh_namesource <0/1>` — display-name source: `0` = botprofile.db name (default), `1` = bot_info.json name. Affects newly created bots only.
 
 ------------------------------------------------------------------------
 
@@ -71,6 +72,10 @@ public interface IBotHiderApi
     // --- write (applied on the next server frame) ---
     bool     SetBotSteamId(int slot, ulong steamId64);
     bool     SetPersonaName(int slot, string name);
+
+    // --- global toggles ---
+    bool     SetDisguise(bool enabled);     // off lets the bot manager spawn bots again
+    bool     SetNameSource(bool useBotInfo); // true=bot_info name, false=botprofile name
 }
 ```
 

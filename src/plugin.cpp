@@ -16,7 +16,8 @@
 #include <cstdint>
 #include <cstring>
 #include <fstream>
-#include <set>
+#include <array>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -83,7 +84,11 @@ static void **g_ppEntSysGlobal = nullptr;
 namespace cs2bh
 {
 
-    static std::set<std::string> g_ExpectedNames;
+    // Maps an expected fake-client name to the bot_info entry chosen for it at CreateFakeClient time
+    static std::unordered_map<std::string, const BotEntry *> g_ExpectedNames;
+
+    // Per-slot bound bot_info entry
+    static std::array<const BotEntry *, PersonaPool::kMaxSlots> g_SlotEntry{};
 
     // Maps where bots stay disguised, loaded from map_whitelist.json
     static std::vector<std::string> g_DisguiseWhitelist;
@@ -468,25 +473,29 @@ namespace cs2bh
 
         // Match incoming pszName
         bool managed = false;
+        const BotEntry *cfg = nullptr;
         if (pszName && pszName[0])
         {
             auto it = g_ExpectedNames.find(pszName);
             if (it != g_ExpectedNames.end())
             {
                 managed = true;
+                cfg = it->second;
                 Personas().MarkSlotManaged(idx, pszName);
                 g_ExpectedNames.erase(it);
             }
             else if (Personas().IsSlotManaged(idx))
             {
                 managed = true;
+                cfg = g_SlotEntry[idx];
             }
         }
         if (!managed)
             RETURN_META(MRES_IGNORED);
 
-        // Resolve the bot_info.json config for this persona
-        auto *cfg = BotInfo().FindByName(pszName);
+        // The bot_info entry chosen at CreateFakeClient time is the identity source,
+        // independent of whether the display name is the botprofile or bot_info name
+        g_SlotEntry[idx] = cfg;
         uint64_t cfgSid = (cfg && cfg->SteamId64 != 0) ? cfg->SteamId64 : 0;
         const char *cfgCross = cfg ? cfg->CrosshairCode.c_str() : nullptr;
 
@@ -544,7 +553,7 @@ namespace cs2bh
             ssc::ClearFakePlayer(pClient);
         }
         auto *raw = reinterpret_cast<unsigned char *>(pClient);
-        auto *entry = BotInfo().FindByName(pszName);
+        auto *entry = g_SlotEntry[idx];
         if (entry && entry->SteamId64 != 0)
         {
             uint64_t sid = MakeUniqueSteamId(idx, entry->SteamId64);
@@ -586,9 +595,9 @@ namespace cs2bh
             DestroyControllerForClient(pClient);
         }
 
-        // Free the bot_info assignment
-        if (!persona.empty())
-            BotInfo().ReleaseAssignment(BotInfo().FindByName(persona.c_str()));
+        // Free the bot_info assignment bound to this slot
+        BotInfo().ReleaseAssignment(g_SlotEntry[idx]);
+        g_SlotEntry[idx] = nullptr;
 
         // Drain manager + personas + shared memory for this slot
         Manager().ReleaseSlot(idx);
@@ -988,22 +997,27 @@ namespace cs2bh
 
         std::string persona;
 
-        // Pick a bot_info.json config
-        auto *entry = BotInfo().PickForBot(netname);
-        if (entry)
+        // Always pick a bot_info.json entry as the identity source (steamid/crosshair/ping)
+        const BotEntry *entry = BotInfo().PickForBot(netname);
+
+        // Display name: bot_info name when the toggle is on, else keep the botprofile name
+        if (m_bUseBotInfoName)
         {
-            persona = entry->Name;
+            if (entry)
+                persona = entry->Name;
+            else
+                persona = Personas().PickFromRoster();
         }
         else
         {
-            persona = Personas().PickFromRoster();
+            persona = (netname && netname[0]) ? netname : Personas().PickFromRoster();
         }
         if (persona.empty())
         {
             RETURN_META_VALUE(MRES_IGNORED, CPlayerSlot(-1));
         }
 
-        g_ExpectedNames.insert(persona);
+        g_ExpectedNames[persona] = entry;
         static thread_local std::string s_PersonaBuffer;
         s_PersonaBuffer = persona;
 
@@ -1101,6 +1115,13 @@ namespace cs2bh
             [this]()
             {
                 RefillBots();
+            },
+            // SET_NAME_SOURCE: global toggle for the display-name source
+            [this](bool useBotInfo)
+            {
+                SetUseBotInfoName(useBotInfo);
+                META_CONPRINTF("[BOTHIDER] name source -> %s\n",
+                               useBotInfo ? "bot_info" : "botprofile");
             });
         RETURN_META(MRES_IGNORED);
     }

@@ -41,6 +41,7 @@ public sealed class SharedMemoryClient : IBotHiderApi, IDisposable
     private const byte CmdRebuild = 4;
     private const byte CmdKickAll = 5;
     private const byte CmdRefill = 6;
+    private const byte CmdSetNameSource = 7;
 
     // Sentinel slot for global commands
     private const byte SlotAll = 255;
@@ -150,6 +151,14 @@ public sealed class SharedMemoryClient : IBotHiderApi, IDisposable
         if (_view == null) TryConnect();
         if (_view == null) return false;
         return PostCommand(CmdSetDisguise, SlotAll, enabled ? 1UL : 0UL, null);
+    }
+
+    // Global display-name source toggle (1=bot_info name, 0=botprofile name)
+    public bool SetNameSource(bool useBotInfo)
+    {
+        if (_view == null) TryConnect();
+        if (_view == null) return false;
+        return PostCommand(CmdSetNameSource, SlotAll, useBotInfo ? 1UL : 0UL, null);
     }
 
     // Request a clean bot rebuild

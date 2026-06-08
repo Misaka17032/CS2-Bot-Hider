@@ -70,6 +70,9 @@ namespace cs2bh
 
         void RefillBots();
 
+        // Toggle the display-name source: true=bot_info.json name, false=botprofile name
+        void SetUseBotInfoName(bool useBotInfo) { m_bUseBotInfoName = useBotInfo; }
+
     private:
         void *m_pHookedGameServer = nullptr;
         int m_StartChangeLevelHookId = 0;
@@ -83,6 +86,9 @@ namespace cs2bh
         int m_SavedQuota = 0;
 
         bool m_bSuppressKickHooks = false;
+
+        // Display-name source: false=botprofile name, true=bot_info.json name
+        bool m_bUseBotInfoName = false;
     };
 
     extern HiderPlugin g_Plugin;

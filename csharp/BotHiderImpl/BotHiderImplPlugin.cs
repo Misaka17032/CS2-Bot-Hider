@@ -185,4 +185,16 @@ public class BotHiderImplPlugin : BasePlugin
         bool ok = _client.SetDisguise(enabled);
         cmd.ReplyToCommand($"[BotHider] disguise -> {(enabled ? "ON" : "OFF")} ({ok})");
     }
+
+    // bh_namesource <0|1> — 0=botprofile name (default), 1=bot_info.json name
+    [ConsoleCommand("bh_namesource", "Set display-name source: bh_namesource <0|1> (0=botprofile 1=bot_info)")]
+    public void OnNameSource(CCSPlayerController? player, CommandInfo cmd)
+    {
+        if (_client == null) { cmd.ReplyToCommand("[BotHider] not initialized"); return; }
+        if (cmd.ArgCount < 2 || !int.TryParse(cmd.GetArg(1), out int v))
+        { cmd.ReplyToCommand("usage: bh_namesource <0|1> (0=botprofile 1=bot_info)"); return; }
+        bool useBotInfo = v != 0;
+        bool ok = _client.SetNameSource(useBotInfo);
+        cmd.ReplyToCommand($"[BotHider] name source -> {(useBotInfo ? "bot_info" : "botprofile")} ({ok})");
+    }
 }

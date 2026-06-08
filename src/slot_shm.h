@@ -55,6 +55,7 @@ namespace cs2bh::shm
         kCmd_Rebuild = 4,     // global clean-rebuild on same-map rematch
         kCmd_KickAll = 5,     // match end: restore flags, bot_kick all, hold quota at 0
         kCmd_Refill = 6,      // match begin: refill bot_quota to the saved value
+        kCmd_SetNameSource = 7, // global toggle, name source carried in Command.SteamId (1=bot_info 0=botprofile)
     };
 
     // Sentinel slot for global (non-per-slot) commands

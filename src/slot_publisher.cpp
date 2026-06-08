@@ -209,7 +209,8 @@ namespace cs2bh
                                       const DisguiseSink &onDisguise,
                                       const RebuildSink &onRebuild,
                                       const KickAllSink &onKickAll,
-                                      const RefillSink &onRefill)
+                                      const RefillSink &onRefill,
+                                      const NameSourceSink &onNameSource)
     {
         if (!m_pView)
             return;
@@ -246,6 +247,12 @@ namespace cs2bh
             if (c.Type == shm::kCmd_Refill && onRefill)
             {
                 onRefill();
+                ++r;
+                continue;
+            }
+            if (c.Type == shm::kCmd_SetNameSource && onNameSource)
+            {
+                onNameSource(c.SteamId != 0);
                 ++r;
                 continue;
             }
