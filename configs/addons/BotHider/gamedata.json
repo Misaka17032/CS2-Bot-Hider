@@ -11,8 +11,8 @@
     "signatures": {
       "library": "server",
       "windows": "48 89 5C 24 ? 55 56 57 41 56 41 57 48 8B EC 48 83 EC ? 48 8B 05",
-      "linux": ""
+      "linux": "55 48 89 E5 41 55 41 54 53 89 FB 48 83 EC 08 E8 ? ? ? ? 41 89 C4 85 DB 74 ? 48 8D 05 ? ? ? ? 44 89 E6 45 31 C0 89 DA B9 0C 00 00 00 48 8B 38 E8 ? ? ? ? 49 89 C4 48 85 C0"
     },
-    "comment": "picks and kicks one client from team"
+    "comment": "picks and kicks one client from team. Linux sig targets the body after the RIP-relative precheck so the inline trampoline can safely copy the prologue."
   }
 }

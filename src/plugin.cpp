@@ -85,6 +85,9 @@ static void **g_ppEntSysGlobal = nullptr;
 // * FIX: inline detour on SV_KickOneFromTeam
 #if defined(_WIN32)
 using KickOneFn = char(__fastcall *)(int /*team*/);
+#else
+using KickOneFn = char (*)(int /*team*/);
+#endif
 static cs2bh::hook::InlineHook g_KickHook;
 static KickOneFn g_pfnKickOneTramp = nullptr;
 
@@ -94,14 +97,17 @@ namespace cs2bh
 }
 
 // Detour
+#if defined(_WIN32)
 static char __fastcall Detour_KickOneFromTeam(int team)
+#else
+static char Detour_KickOneFromTeam(int team)
+#endif
 {
     // Phantom kick: report success so the caller stops without evicting SourceTV
     if (team == 0 && cs2bh::ServerHasHltvClient())
         return 1;
     return g_pfnKickOneTramp ? g_pfnKickOneTramp(team) : 0;
 }
-#endif
 
 namespace cs2bh
 {
@@ -158,7 +164,6 @@ namespace cs2bh
         return humans;
     }
 
-#if defined(_WIN32)
     // True if any connected client is the SourceTV/HLTV client
     bool ServerHasHltvClient()
     {
@@ -167,8 +172,10 @@ namespace cs2bh
         auto *gs = g_pNetworkServerService->GetIGameServer();
         if (!gs)
             return false;
+#if defined(_WIN32)
         __try
         {
+#endif
             auto *vec = reinterpret_cast<CUtlVector<void *> *>(
                 reinterpret_cast<unsigned char *>(gs) + targets::kClientListOffset);
             int count = vec->Count();
@@ -184,13 +191,14 @@ namespace cs2bh
                     return true;
             }
             return false;
+#if defined(_WIN32)
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
         {
             return false;
         }
-    }
 #endif
+    }
 
     // True if sid is already live on any connected client other than exceptSlot
     static bool IsSteamIdInUseByOther(uint64_t sid, int exceptSlot)
@@ -284,7 +292,6 @@ namespace cs2bh
         }
     }
 
-#if defined(_WIN32)
     // Resolve SV_KickOneFromTeam by sig and install the team-0 kick-guard detour
     static void InstallKickGuardHook(const nlohmann::json &gamedata, const sig::ModuleInfo &serverModule)
     {
@@ -304,16 +311,20 @@ namespace cs2bh
             META_CONPRINTF("[BOTHIDER] warning: SV_KickOneFromTeam sig not found — GOTV kick-guard disabled\n");
             return;
         }
+#if defined(_WIN32)
         constexpr size_t kStealLen = 19;
+#else
+        // Linux gamedata points at the function body after the RIP-relative precheck.
+        constexpr size_t kStealLen = 15;
+#endif
         if (!g_KickHook.Install(target, reinterpret_cast<void *>(&Detour_KickOneFromTeam), kStealLen))
         {
             META_CONPRINTF("[BOTHIDER] warning: SV_KickOneFromTeam detour install failed — GOTV kick-guard disabled\n");
             return;
         }
         g_pfnKickOneTramp = reinterpret_cast<KickOneFn>(g_KickHook.Trampoline());
-        META_CONPRINTF("[BOTHIDER] GOTV kick-guard installed\n");
+        META_CONPRINTF("[BOTHIDER] GOTV kick-guard installed at %p\n", target);
     }
-#endif
 
     // SEH-isolated single reads, used by the controller-resolution walk
     static bool SehReadPtr(const void *addr, void **out)
@@ -1295,10 +1306,8 @@ namespace cs2bh
                     serverModule = sig::ModuleFromName(targets::kServerModuleName);
                 ResolveUtilRemoveAndEntSys(gamedata, serverModule);
 
-#if defined(_WIN32)
                 // Install the team-0 kick-guard that keeps SourceTV alive (GOTV fix)
                 InstallKickGuardHook(gamedata, serverModule);
-#endif
             }
         }
         if (g_pfnUtilRemove)
@@ -1434,11 +1443,9 @@ namespace cs2bh
             m_StartChangeLevelHookId = 0;
         }
         m_pHookedGameServer = nullptr;
-#if defined(_WIN32)
         // Tear down the kick-guard detour before the module unloads
         g_KickHook.Remove();
         g_pfnKickOneTramp = nullptr;
-#endif
         Manager().ReleaseAll();
         Publisher().Shutdown();
         return true;
