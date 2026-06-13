@@ -12,13 +12,14 @@ namespace cs2bh::targets
 
     // CNetworkGameServerBase::m_Clients — CUtlVector<CServerSideClient*>
     // at +592 (m_nCount), +600 (m_pElements), +608 (m_nAllocCount), +612 (flags)
-    inline constexpr int kClientListOffset = 592;
+    // runtime-overridable from gamedata.json; default is the fallback
+    inline int kClientListOffset = 592;
 
     // CServerSideClient::m_bFakePlayer
-    inline constexpr int kFakePlayerOffset = 160;
+    inline int kFakePlayerOffset = 160;
 
     // CServerSideClient::m_Name — CUtlString { char* m_pString } @ +0
-    inline constexpr int kNameOffset = 64;
+    inline int kNameOffset = 64;
 
     // IServerGameClients (VCSource2GameClients) vtable slots
     inline constexpr int kVTSlot_OnClientConnected = 11;

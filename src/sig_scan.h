@@ -31,6 +31,9 @@ namespace cs2bh::sig
 
     std::string FindPlatformSig(const nlohmann::json &gamedata, const std::string &name);
 
+    // Read gamedata[name].offsets[platform]; returns fallback if missing/non-integer
+    int FindPlatformOffset(const nlohmann::json &gamedata, const std::string &name, int fallback);
+
     const char *PlatformName();
 
     bool ParseSigString(const std::string &sigStr,

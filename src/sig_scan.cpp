@@ -182,6 +182,21 @@ namespace cs2bh::sig
         return platformIt->get<std::string>();
     }
 
+    // Read gamedata[name].offsets[platform]; fall back if entry missing/non-integer
+    int FindPlatformOffset(const nlohmann::json &gamedata, const std::string &name, int fallback)
+    {
+        auto it = gamedata.find(name);
+        if (it == gamedata.end() || !it->is_object())
+            return fallback;
+        auto offIt = it->find("offsets");
+        if (offIt == it->end() || !offIt->is_object())
+            return fallback;
+        auto platformIt = offIt->find(PlatformName());
+        if (platformIt == offIt->end() || !platformIt->is_number_integer())
+            return fallback;
+        return platformIt->get<int>();
+    }
+
     bool ParseSigString(const std::string &sigStr,
                         std::vector<uint8_t> &outBytes,
                         std::vector<bool> &outWild)

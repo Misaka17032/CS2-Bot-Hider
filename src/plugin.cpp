@@ -292,6 +292,27 @@ namespace cs2bh
         }
     }
 
+    // Override member offsets from gamedata.json; missing entries keep their fallback
+    static void LoadMemberOffsets(const nlohmann::json &gamedata)
+    {
+        using sig::FindPlatformOffset;
+        // CServerSideClient layout — shifts as a block across game updates
+        ssc::OFFSET_m_UserIDString = FindPlatformOffset(gamedata, "CServerSideClient::m_UserIDString", ssc::OFFSET_m_UserIDString);
+        ssc::OFFSET_m_Name = FindPlatformOffset(gamedata, "CServerSideClient::m_Name", ssc::OFFSET_m_Name);
+        ssc::OFFSET_m_nClientSlot = FindPlatformOffset(gamedata, "CServerSideClient::m_nClientSlot", ssc::OFFSET_m_nClientSlot);
+        ssc::OFFSET_m_nEntityIndex = FindPlatformOffset(gamedata, "CServerSideClient::m_nEntityIndex", ssc::OFFSET_m_nEntityIndex);
+        ssc::OFFSET_m_Server = FindPlatformOffset(gamedata, "CServerSideClient::m_Server", ssc::OFFSET_m_Server);
+        ssc::OFFSET_m_NetChannel = FindPlatformOffset(gamedata, "CServerSideClient::m_NetChannel", ssc::OFFSET_m_NetChannel);
+        ssc::OFFSET_m_nSignonState = FindPlatformOffset(gamedata, "CServerSideClient::m_nSignonState", ssc::OFFSET_m_nSignonState);
+        ssc::OFFSET_m_pAttachedTo = FindPlatformOffset(gamedata, "CServerSideClient::m_pAttachedTo", ssc::OFFSET_m_pAttachedTo);
+        ssc::OFFSET_m_bFakePlayer = FindPlatformOffset(gamedata, "CServerSideClient::m_bFakePlayer", ssc::OFFSET_m_bFakePlayer);
+        ssc::OFFSET_m_UserID = FindPlatformOffset(gamedata, "CServerSideClient::m_UserID", ssc::OFFSET_m_UserID);
+        ssc::OFFSET_m_SteamID = FindPlatformOffset(gamedata, "CServerSideClient::m_SteamID", ssc::OFFSET_m_SteamID);
+        ssc::OFFSET_m_bIsHLTV = FindPlatformOffset(gamedata, "CServerSideClient::m_bIsHLTV", ssc::OFFSET_m_bIsHLTV);
+        // CNetworkGameServerBase::m_Clients vector base
+        targets::kClientListOffset = FindPlatformOffset(gamedata, "CNetworkGameServerBase::m_Clients", targets::kClientListOffset);
+    }
+
     // Resolve SV_KickOneFromTeam by sig and install the team-0 kick-guard detour
     static void InstallKickGuardHook(const nlohmann::json &gamedata, const sig::ModuleInfo &serverModule)
     {
@@ -1301,6 +1322,9 @@ namespace cs2bh
             }
             else
             {
+                // Override member offsets from gamedata.json (fallback kept if absent)
+                LoadMemberOffsets(gamedata);
+
                 sig::ModuleInfo serverModule = sig::ModuleFromInterfacePtr(gameclients);
                 if (!serverModule)
                     serverModule = sig::ModuleFromName(targets::kServerModuleName);
