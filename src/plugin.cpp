@@ -114,6 +114,41 @@ static char Detour_KickOneFromTeam(int team)
     return g_pfnKickOneTramp ? g_pfnKickOneTramp(team) : 0;
 }
 
+// * inline detour on CCSBotManager::MaintainBotQuota
+#if defined(_WIN32)
+using MaintainQuotaFn = int64_t(__fastcall *)(void * /*CCSBotManager*/);
+#else
+using MaintainQuotaFn = int64_t (*)(void * /*CCSBotManager*/);
+#endif
+static cs2bh::hook::InlineHook g_QuotaHook;
+static MaintainQuotaFn g_pfnQuotaTramp = nullptr;
+
+namespace cs2bh
+{
+    // Flip managed bots' controller fakeclient bit (+904 & 0x100) around the engine
+    // quota pass, so the human/bot counters see them as bots and the target is computed right.
+    int FlipManagedController904(bool restore, std::array<bool, 64> *saved);
+}
+
+// Detour
+#if defined(_WIN32)
+static int64_t __fastcall Detour_MaintainBotQuota(void *mgr)
+#else
+static int64_t Detour_MaintainBotQuota(void *mgr)
+#endif
+{
+    /* Disguised bots clear the controller fakeclient bit (+904 & 0x100) to fool the
+       scoreboard, but that also makes the engine's human counter count them as humans
+       while the bot counter (IsBot vtable) still counts them as bots. The fill/match
+       target formula (quota - humans) then cancels out, freezing add/remove.
+       Flip the bit back for the duration of the pass so both counters agree. */
+    std::array<bool, 64> flipped;
+    cs2bh::FlipManagedController904(false, &flipped);
+    int64_t r = g_pfnQuotaTramp ? g_pfnQuotaTramp(mgr) : 0;
+    cs2bh::FlipManagedController904(true, &flipped);
+    return r;
+}
+
 namespace cs2bh
 {
 
@@ -352,6 +387,41 @@ namespace cs2bh
         META_CONPRINTF("[BOTHIDER] GOTV kick-guard installed at %p\n", target);
     }
 
+    // Resolve CCSBotManager::MaintainBotQuota by sig and install the flip-around detour
+    static void InstallQuotaHook(const nlohmann::json &gamedata, const sig::ModuleInfo &serverModule)
+    {
+        if (!serverModule)
+            return;
+        std::string sigStr = sig::FindPlatformSig(gamedata, "CCSBotManager::MaintainBotQuota");
+        std::vector<uint8_t> bytes;
+        std::vector<bool> wild;
+        if (sigStr.empty() || !sig::ParseSigString(sigStr, bytes, wild))
+        {
+            META_CONPRINTF("[BOTHIDER] warning: MaintainBotQuota sig missing — quota fix disabled\n");
+            return;
+        }
+        void *target = sig::FindPatternIn(serverModule, bytes, wild);
+        if (!target)
+        {
+            META_CONPRINTF("[BOTHIDER] warning: MaintainBotQuota sig not found — quota fix disabled\n");
+            return;
+        }
+#if defined(_WIN32)
+        // 40 55 / 41 56 / 48 8D 6C 24 ? / 48 81 EC ???? / 4C 8B F1 = 19 bytes (FF 15 rel-call not stolen)
+        constexpr size_t kStealLen = 19;
+#else
+        // 55 / 31 F6 / 48 89 E5 / 41 57 / 41 56 / 41 55 / 49 89 FD = 15 bytes
+        constexpr size_t kStealLen = 15;
+#endif
+        if (!g_QuotaHook.Install(target, reinterpret_cast<void *>(&Detour_MaintainBotQuota), kStealLen))
+        {
+            META_CONPRINTF("[BOTHIDER] warning: MaintainBotQuota detour install failed — quota fix disabled\n");
+            return;
+        }
+        g_pfnQuotaTramp = reinterpret_cast<MaintainQuotaFn>(g_QuotaHook.Trampoline());
+        META_CONPRINTF("[BOTHIDER] bot-quota fix installed at %p\n", target);
+    }
+
     // SEH-isolated single reads, used by the controller-resolution walk
     static bool SehReadPtr(const void *addr, void **out)
     {
@@ -504,6 +574,56 @@ namespace cs2bh
         META_CONPRINTF("[BOTHIDER] destroy dispatched entIdx=%d inst=%p cls='%s'\n",
                        entIdx, inst, cls);
         return true;
+    }
+
+    // Flip managed bots' controller fakeclient bit (+904 & 0x100) around the quota pass.
+    // restore=false: OR-in 0x100 where it reads as human, record the slots touched.
+    // restore=true:  clear 0x100 on the recorded slots, restoring the scoreboard disguise.
+    int FlipManagedController904(bool restore, std::array<bool, 64> *saved)
+    {
+        if (!saved)
+            return 0;
+        constexpr int kCtrlOff = targets::kController_FakeClientFlagsOffset;
+        constexpr uint32_t kBit = 0x100;
+        int touched = 0;
+        for (int idx = 0; idx < PersonaPool::kMaxSlots; ++idx)
+        {
+            if (!restore)
+                (*saved)[idx] = false;
+            if (!restore && !Manager().IsManaged(idx))
+                continue;
+            if (restore && !(*saved)[idx])
+                continue;
+
+            void *pClient = ResolveClientBySlot(idx);
+            if (!pClient)
+                continue;
+            int entIdx = *reinterpret_cast<int *>(
+                reinterpret_cast<unsigned char *>(pClient) + ssc::OFFSET_m_nEntityIndex);
+            char cls[64];
+            void *ctrl = ResolveEntityInstance(entIdx, cls, sizeof(cls));
+            if (!ctrl || std::strcmp(cls, "cs_player_controller") != 0)
+                continue;
+
+            auto *p = reinterpret_cast<uint32_t *>(
+                reinterpret_cast<unsigned char *>(ctrl) + kCtrlOff);
+            if (!restore)
+            {
+                if ((*p & kBit) == 0) // only flip slots that read as human
+                {
+                    *p |= kBit;
+                    (*saved)[idx] = true;
+                    ++touched;
+                }
+            }
+            else
+            {
+                *p &= ~kBit;
+                (*saved)[idx] = false;
+                ++touched;
+            }
+        }
+        return touched;
     }
 
     // Reset a disguised bot's idle timer
@@ -879,8 +999,8 @@ namespace cs2bh
         if (!IsKickCommand(cmdName))
             RETURN_META(MRES_IGNORED);
 
-        // Match-end kickid
-        if (m_bSuppressKickHooks || m_bRebuilding)
+        // Disguise-toggle rebuild in progress: skip
+        if (m_bRebuilding)
             RETURN_META(MRES_IGNORED);
 
         int restored = 0;
@@ -914,10 +1034,6 @@ namespace cs2bh
         if (!IsKickCommand(cmdName))
             RETURN_META(MRES_IGNORED);
 
-        // Match-end kickid
-        if (m_bSuppressKickHooks)
-            RETURN_META(MRES_IGNORED);
-
         // Disguise-toggle rebuild: skip re-disguise + quota write, clear the flag
         if (m_bRebuilding)
         {
@@ -941,13 +1057,6 @@ namespace cs2bh
             if (sid != 0)
                 *reinterpret_cast<uint64_t *>(raw + ssc::OFFSET_m_SteamID) = sid;
             ++redisguised;
-        }
-        // Set bot_quota
-        if (engine)
-        {
-            char quotaCmd[48];
-            std::snprintf(quotaCmd, sizeof(quotaCmd), "bot_quota %d\n", redisguised);
-            engine->ServerCommand(quotaCmd);
         }
         META_CONPRINTF("[BOTHIDER] kick POST '%s' redisguised=%d quota=%d\n",
                        cmd.GetName(), redisguised, redisguised);
@@ -1050,65 +1159,6 @@ namespace cs2bh
         engine->ServerCommand(quotaCmd);
         META_CONPRINTF("[BOTHIDER] rematch rebuild — kicked %d bot(s), bot_quota->%d\n",
                        managed, quota);
-    }
-
-    // Match-end
-    void HiderPlugin::KickAllBots()
-    {
-        if (m_bSelfDisabled || !engine)
-            return;
-
-        int quota = 0;
-        ConVarRefAbstract botQuota("bot_quota");
-        if (botQuota.IsValidRef())
-            quota = botQuota.GetInt();
-
-        m_bSuppressKickHooks = true;
-
-        engine->ServerCommand("bot_quota 0\n");
-
-        // kickid
-        int kicked = 0;
-        int managed = 0;
-        for (int idx = 0; idx < PersonaPool::kMaxSlots; ++idx)
-        {
-            if (!Manager().IsManaged(idx))
-                continue;
-            ++managed;
-            void *pClient = ResolveClientBySlot(idx);
-            if (!pClient)
-                continue;
-            ssc::SetFakePlayer(pClient);
-            int16_t userId = *reinterpret_cast<int16_t *>(
-                reinterpret_cast<unsigned char *>(pClient) + ssc::OFFSET_m_UserID);
-            char kickCmd[32];
-            std::snprintf(kickCmd, sizeof(kickCmd), "kickid %d\n", static_cast<int>(userId));
-            engine->ServerCommand(kickCmd);
-            ++kicked;
-        }
-
-        m_SavedQuota = quota > 0 ? quota : managed;
-        META_CONPRINTF("[BOTHIDER] match-end kick — kickid issued for %d/%d bot(s), "
-                       "quota saved=%d, held at 0\n",
-                       kicked, managed, m_SavedQuota);
-    }
-
-    // Match-begin
-    void HiderPlugin::RefillBots()
-    {
-        if (m_bSelfDisabled || !engine)
-            return;
-        m_bSuppressKickHooks = false;
-        int quota = m_SavedQuota > 0 ? m_SavedQuota : 0;
-        if (quota == 0)
-        {
-            META_CONPRINTF("[BOTHIDER] match-begin refill skipped — no saved quota\n");
-            return;
-        }
-        char quotaCmd[48];
-        std::snprintf(quotaCmd, sizeof(quotaCmd), "bot_quota %d\n", quota);
-        engine->ServerCommand(quotaCmd);
-        META_CONPRINTF("[BOTHIDER] match-begin refill — bot_quota->%d\n", quota);
     }
 
     // Replace the name with the next name from bot_info.json
@@ -1230,16 +1280,6 @@ namespace cs2bh
             {
                 RebuildBots();
             },
-            // KICK_ALL
-            [this]()
-            {
-                KickAllBots();
-            },
-            // REFILL
-            [this]()
-            {
-                RefillBots();
-            },
             // SET_NAME_SOURCE: global toggle for the display-name source
             [this](bool useBotInfo)
             {
@@ -1335,8 +1375,11 @@ namespace cs2bh
                     serverModule = sig::ModuleFromName(targets::kServerModuleName);
                 ResolveUtilRemoveAndEntSys(gamedata, serverModule);
 
-                // Install the team-0 kick-guard that keeps SourceTV alive (GOTV fix)
+                // Install the team-0 kick-guard that keeps SourceTV alive
                 InstallKickGuardHook(gamedata, serverModule);
+
+                // Install the bot-quota flip-around detour
+                InstallQuotaHook(gamedata, serverModule);
             }
         }
         if (g_pfnUtilRemove)
@@ -1472,9 +1515,10 @@ namespace cs2bh
             m_StartChangeLevelHookId = 0;
         }
         m_pHookedGameServer = nullptr;
-        // Tear down the kick-guard detour before the module unloads
         g_KickHook.Remove();
         g_pfnKickOneTramp = nullptr;
+        g_QuotaHook.Remove();
+        g_pfnQuotaTramp = nullptr;
         Manager().ReleaseAll();
         Publisher().Shutdown();
         return true;

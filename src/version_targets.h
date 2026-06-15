@@ -49,6 +49,9 @@ namespace cs2bh::targets
     // CBasePlayerController::m_iszPlayerName
     inline constexpr int kController_PlayerNameOffset = 1780;
 
+    // We re-set it only for the duration of MaintainBotQuota so humans/bots are counted consistently.
+    inline constexpr int kController_FakeClientFlagsOffset = 904; // 0x388
+
     // CUtlString::Set mangled name in tier0.dll
 #if defined(_WIN32)
     inline constexpr const char *kSym_CUtlString_Set =

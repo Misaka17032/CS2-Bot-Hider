@@ -31,7 +31,7 @@ namespace cs2bh
         const char *GetDescription() override { return "Bot persona/steamid/ping hider"; }
         const char *GetURL() override { return ""; }
         const char *GetLicense() override { return "GPLv3"; }
-        const char *GetVersion() override { return "0.2.1"; }
+        const char *GetVersion() override { return "0.2.3"; }
         const char *GetDate() override { return __DATE__; }
         const char *GetLogTag() override { return "BOTHIDER"; }
 
@@ -66,10 +66,6 @@ namespace cs2bh
 
         void RebuildBots();
 
-        void KickAllBots();
-
-        void RefillBots();
-
         // Toggle the display-name source: true=bot_info.json name, false=botprofile name
         void SetUseBotInfoName(bool useBotInfo) { m_bUseBotInfoName = useBotInfo; }
 
@@ -82,10 +78,6 @@ namespace cs2bh
         bool m_bDisguiseEnabled = true;
 
         bool m_bRebuilding = false;
-
-        int m_SavedQuota = 0;
-
-        bool m_bSuppressKickHooks = false;
 
         // Display-name source: false=botprofile name, true=bot_info.json name
         bool m_bUseBotInfoName = false;

@@ -15,6 +15,14 @@
     },
     "comment": "picks and kicks one client from team. Linux signature targets the bool kick helper that disconnects with NETWORK_DISCONNECT_KICKED, not the bot-add helper."
   },
+  "CCSBotManager::MaintainBotQuota": {
+    "signatures": {
+      "library": "server",
+      "windows": "40 55 41 56 48 8D 6C 24 ? 48 81 EC ? ? ? ? 4C 8B F1 FF 15",
+      "linux": "55 31 F6 48 89 E5 41 57 41 56 41 55 49 89 FD"
+    },
+    "comment": "runs the bot_quota pass each think. Detoured to set disguised bots' controller fakeclient bit so the human/bot counters agree and the quota target is computed correctly."
+  },
   "CNetworkGameServerBase::m_Clients": {
     "offsets": {
       "windows": 592,

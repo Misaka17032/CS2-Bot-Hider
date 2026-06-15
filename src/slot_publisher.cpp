@@ -208,8 +208,6 @@ namespace cs2bh
                                       const PersonaSink &onPersona,
                                       const DisguiseSink &onDisguise,
                                       const RebuildSink &onRebuild,
-                                      const KickAllSink &onKickAll,
-                                      const RefillSink &onRefill,
                                       const NameSourceSink &onNameSource)
     {
         if (!m_pView)
@@ -235,18 +233,6 @@ namespace cs2bh
             if (c.Type == shm::kCmd_Rebuild && onRebuild)
             {
                 onRebuild();
-                ++r;
-                continue;
-            }
-            if (c.Type == shm::kCmd_KickAll && onKickAll)
-            {
-                onKickAll();
-                ++r;
-                continue;
-            }
-            if (c.Type == shm::kCmd_Refill && onRefill)
-            {
-                onRefill();
                 ++r;
                 continue;
             }
