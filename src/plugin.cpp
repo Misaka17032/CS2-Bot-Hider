@@ -580,7 +580,7 @@ namespace cs2bh
     {
         if (!saved)
             return 0;
-        constexpr int kCtrlOff = targets::kController_FakeClientFlagsOffset;
+        const int kCtrlOff = targets::kController_FakeClientFlagsOffset;
         constexpr uint32_t kBit = 0x100;
         int touched = 0;
         for (int idx = 0; idx < PersonaPool::kMaxSlots; ++idx)
